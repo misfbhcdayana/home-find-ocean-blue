@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -8,12 +7,16 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/firebase";
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -22,20 +25,19 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
+    setSuccess('');
 
     try {
-      await login(email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      setSuccess("Login successful!");
       toast({
         title: "Welcome back!",
         description: "You've been successfully logged in.",
       });
       navigate('/dashboard');
-    } catch (error) {
-      toast({
-        title: "Login failed",
-        description: "Please check your credentials and try again.",
-        variant: "destructive",
-      });
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
@@ -83,15 +85,13 @@ const Login = () => {
                   required
                   className="border-ocean pr-10"
                 />
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
-                  size="icon"
                   className="absolute right-0 top-0 h-full px-3 text-ocean-muted hover:text-ocean-primary"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
+                </button>
               </div>
             </div>
             
@@ -123,6 +123,8 @@ const Login = () => {
             </p>
           </CardFooter>
         </form>
+        {error && <div className="text-center text-sm text-red-500 mt-4">{error}</div>}
+        {success && <div className="text-center text-sm text-green-500 mt-4">{success}</div>}
       </Card>
     </div>
   );

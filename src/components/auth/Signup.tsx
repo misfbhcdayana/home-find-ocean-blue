@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2, Home, Building } from 'lucide-react';
+import { apiFetch } from "@/lib/api";
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -20,6 +20,8 @@ const Signup = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   
   const { signup } = useAuth();
   const navigate = useNavigate();
@@ -28,6 +30,8 @@ const Signup = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError("");
+    setSuccess("");
 
     if (formData.password !== formData.confirmPassword) {
       toast({
@@ -40,18 +44,17 @@ const Signup = () => {
     }
 
     try {
-      await signup(formData.email, formData.password, formData.name, formData.role);
+      await apiFetch("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({ email: formData.email, password: formData.password }),
+      });
       toast({
         title: "Account created!",
         description: "Welcome to LocateYourHome. Let's get started!",
       });
       navigate('/dashboard');
-    } catch (error) {
-      toast({
-        title: "Signup failed",
-        description: "Please try again or contact support if the problem persists.",
-        variant: "destructive",
-      });
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
@@ -142,8 +145,6 @@ const Signup = () => {
                 />
                 <Button
                   type="button"
-                  variant="ghost"
-                  size="icon"
                   className="absolute right-0 top-0 h-full px-3 text-ocean-muted hover:text-ocean-primary"
                   onClick={() => setShowPassword(!showPassword)}
                 >
@@ -184,6 +185,8 @@ const Signup = () => {
             </p>
           </CardFooter>
         </form>
+        {error && <div className="text-center text-sm text-red-500 mt-4">{error}</div>}
+        {success && <div className="text-center text-sm text-green-500 mt-4">{success}</div>}
       </Card>
     </div>
   );

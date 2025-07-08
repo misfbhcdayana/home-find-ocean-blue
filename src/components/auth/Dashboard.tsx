@@ -1,14 +1,60 @@
-
-import React from 'react';
+import React, { useEffect, useState } from "react";
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import { Search, Upload, Home, Building, Users, BarChart3 } from 'lucide-react';
+import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { auth } from '@/firebase';
+import { apiFetch } from '@/lib/api';
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
   const navigate = useNavigate();
+  const [user, setUser] = useState<any>(null);
+  const [error, setError] = useState("");
+  const [location, setLocation] = useState("");
+  const [rentals, setRentals] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    if (!authUser) {
+      setError("Not logged in");
+      return;
+    }
+    const fetchUserProfile = async () => {
+      try {
+        const db = getFirestore();
+        const userDoc = await getDoc(doc(db, "users", authUser.uid));
+        if (userDoc.exists()) {
+          setUser({ ...userDoc.data(), uid: authUser.uid });
+        } else {
+          setUser({ email: authUser.email, uid: authUser.uid });
+        }
+      } catch (err: any) {
+        setError(err.message);
+      }
+    };
+    fetchUserProfile();
+  }, [authUser]);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearching(true);
+    setRentals([]);
+    setError("");
+    try {
+      const res = await apiFetch('/scrape', {
+        method: 'POST',
+        body: JSON.stringify({ location }),
+      });
+      setRentals(res.rentals);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSearching(false);
+    }
+  };
 
   const handleSearchRentals = () => {
     navigate('/feed');
@@ -68,21 +114,58 @@ const Dashboard = () => {
 
   const actions = user?.role === 'landlord' ? landlordActions : tenantActions;
 
+  if (error) return <div style={{ color: "red" }}>{error}</div>;
+  if (!user) return <div>Loading...</div>;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 dark:from-slate-900 dark:to-slate-800">
       <div className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-ocean-primary mb-2">
-            Welcome back, {user?.name}!
+            Welcome back, {user?.name || user?.email}!
           </h1>
           <p className="text-ocean-secondary text-lg">
             {user?.role === 'landlord' 
               ? 'Manage your properties and connect with potential tenants'
-              : 'Find your perfect rental home'
-            }
+              : 'Find your perfect rental home'}
           </p>
         </div>
+
+        {/* Tenant Search Bar */}
+        {user?.role !== 'landlord' && (
+          <div className="mb-8">
+            <form onSubmit={handleSearch} className="flex gap-2 max-w-xl mx-auto">
+              <input
+                type="text"
+                placeholder="Enter a location (e.g. New York, NY)"
+                value={location}
+                onChange={e => setLocation(e.target.value)}
+                className="flex-1 px-4 py-2 border rounded"
+                required
+              />
+              <Button type="submit" className="ocean-primary" disabled={searching}>
+                {searching ? 'Searching...' : 'Search Rentals'}
+              </Button>
+            </form>
+            {rentals.length > 0 && (
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {rentals.map((rental, idx) => (
+                  <Card key={idx} className="ocean-shadow">
+                    <CardContent className="p-4">
+                      {rental.image && <img src={rental.image} alt={rental.title} className="w-full h-40 object-cover rounded mb-2" />}
+                      <div className="font-bold text-lg mb-1">{rental.title}</div>
+                      <div className="text-ocean-secondary mb-1">{rental.price}</div>
+                      <div className="text-sm text-ocean-muted mb-1">{rental.address}</div>
+                      <div className="text-xs text-gray-500 mb-1">Source: {rental.source}</div>
+                      <a href={rental.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">View Listing</a>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
